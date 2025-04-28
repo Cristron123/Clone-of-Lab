@@ -1,7 +1,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -std=c99
 LIBS    = -lrt -pthread
-DUNGEON = dungeon_X86_64.o
+DUNGEON = dungeon.o
 
 all: game barbarian wizard rogue
 
