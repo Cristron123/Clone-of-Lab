@@ -1,12 +1,13 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -std=c99
+LDFLAGS = -Wl,--allow-multiple-definition
 LIBS    = -lrt -pthread
 DUNGEON = dungeon.o
 
 all: game barbarian wizard rogue
 
 game: game.c $(DUNGEON)
-	$(CC) $(CFLAGS) -o $@ game.c $(DUNGEON) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ game.c $(DUNGEON) $(LIBS)
 
 barbarian: barbarian.c
 	$(CC) $(CFLAGS) -o $@ barbarian.c $(LIBS)
@@ -19,4 +20,3 @@ rogue: rogue.c
 
 clean:
 	rm -f game barbarian wizard rogue
-
