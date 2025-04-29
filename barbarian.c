@@ -18,6 +18,9 @@ void handler(int sig) {
     if (sig == DUNGEON_SIGNAL) {
         // Copy the enemy's health into attack
         d->barbarian.attack = d->enemy.health;
+        printf("[barb] caught SIGUSR1: health=%d, attack now=%d\n",
+               d->enemy.health,
+               d->barbarian.attack);
     }
     else if (sig == SEMAPHORE_SIGNAL) {
         // Hold Lever One until Rogue releases it
