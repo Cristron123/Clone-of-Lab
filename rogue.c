@@ -16,7 +16,7 @@ static sem_t *lever1, *lever2;
 static float low, high;
 static int   init_search = 0;
 
-// Perform or adjust a binary‑search guess
+// Perform or adjust a binary-search guess
 void do_binary_search(void) {
     if (!init_search) {
         low  = 0.0f;
@@ -33,6 +33,11 @@ void do_binary_search(void) {
         }
     }
     d->rogue.pick = (low + high) / 2.0f;
+
+    // debug print to watch convergence
+    printf("[rogue] tick: direction=%c, new pick=%.6f\n",
+           d->trap.direction, d->rogue.pick);
+    fflush(stdout);
 }
 
 void handler(int sig) {
@@ -47,6 +52,9 @@ void handler(int sig) {
         // Release both levers so Barbarian + Wizard unblock
         sem_post(lever1);
         sem_post(lever2);
+
+        // reset search for next trap
+        init_search = 0;
     }
 }
 
@@ -78,4 +86,3 @@ int main(void) {
     }
     return 0;
 }
-
