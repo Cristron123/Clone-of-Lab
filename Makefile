@@ -1,22 +1,27 @@
-CC      = gcc
-CFLAGS  = -Wall -Wextra -std=c99
-LDFLAGS = -Wl,--allow-multiple-definition
-LIBS    = -lrt -pthread
-DUNGEON = dungeon.o
+# Makefile
+
+CC       = gcc
+CFLAGS   = -Wall -Wextra -std=c99
+LDFLAGS  = -Wl,--allow-multiple-definition
+LIBS     = -lrt -pthread
+
+DUNGEON_OBJ = dungeon.o
+
+.PHONY: all clean
 
 all: game barbarian wizard rogue
 
-game: game.c $(DUNGEON)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ game.c $(DUNGEON) $(LIBS)
+game: game.c $(DUNGEON_OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 barbarian: barbarian.c
-	$(CC) $(CFLAGS) -o $@ barbarian.c $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 
 wizard: wizard.c
-	$(CC) $(CFLAGS) -o $@ wizard.c $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 
 rogue: rogue.c
-	$(CC) $(CFLAGS) -o $@ rogue.c $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 
 clean:
 	rm -f game barbarian wizard rogue
