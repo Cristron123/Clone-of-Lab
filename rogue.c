@@ -87,7 +87,7 @@ int main(void) {
 
     // 3) prime initial pick so Dungeon can start us off
     d->rogue.pick = MAX_PICK_ANGLE / 2.0f;
-    init_search   = 1;
+    init_search   = 0;
 
     // 4) install one handler for both signals
     struct sigaction sa = { .sa_handler = handler };
