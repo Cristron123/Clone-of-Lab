@@ -23,27 +23,27 @@ static int   init_search = 0;
 void do_binary_search(void) {
     char dir = d->trap.direction;
 
+    // If the dungeon has just signaled success, reset for next
+    if (dir == '-') {
+        init_search = 0;
+        return;
+    }
+
+    // If this is the very first time, just set up bounds & guess midpoint
     if (!init_search) {
-        // First time: initialize bounds
         low         = 0.0f;
         high        = MAX_PICK_ANGLE;
         init_search = 1;
     }
+    // Otherwise adjust bounds based on too‐low / too‐high feedback
     else if (dir == 'u') {
-        // Pick was too low → raise low bound
         low = d->rogue.pick;
     }
     else if (dir == 'd') {
-        // Pick was too high → lower high bound
         high = d->rogue.pick;
     }
-    else if (dir == '-') {
-        // Success! reset for next lock
-        init_search = 0;
-        return;
-    }
+    // Ignore any 't' (waiting) spurious signals
     else {
-        // Still waiting on dungeon (“t”) or spurious; do nothing
         return;
     }
 
@@ -65,7 +65,7 @@ void handler(int sig) {
         // Release both levers so Barbarian + Wizard can finish up
         sem_post(lever1);
         sem_post(lever2);
-        // Prepare binary‐search state for next time
+        // Prepare binary‐search state fresh next time
         init_search = 0;
     }
 }
@@ -88,10 +88,11 @@ int main(void) {
         perror("sem_open lever"); exit(1);
     }
 
-    // 3) Prime the very first guess, but let the handler initialize bounds
-    d->rogue.pick     = MAX_PICK_ANGLE / 2.0f;
+    // 3) Prime nothing here—let the first DUNGEON_SIGNAL trigger init
+    init_search = 0;
+    // But set a dummy pick so direction != '-' when first signal arrives
+    d->rogue.pick     = 0;
     d->trap.direction = 't';
-    init_search       = 0;  // clear so first signal sets low/high
 
     // 4) Install our single handler for both signals
     struct sigaction sa = { .sa_handler = handler };
