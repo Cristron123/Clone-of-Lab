@@ -29,7 +29,7 @@ volatile sig_atomic_t exit_flag = 0;
 
 // Signal handler for SIGINT -> graceful exit
 static void handle_sigint(int sig) {
-    void(sig);
+    (void)sig;
     exit_flag = 1;
 }
 
