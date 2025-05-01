@@ -1,4 +1,7 @@
 // rogue.c
+#define _XOPEN_SOURCE 700       // for usleep(), sigaction, etc.
+#define _POSIX_C_SOURCE 200809L // for POSIX.1-2008 features
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -29,15 +32,12 @@ void do_binary_search(void) {
         } else if (dir == 'd') {
             high = d->rogue.pick;
         } else if (dir == '-') {
-            return;  // Guess is within LOCK_THRESHOLD
+            return;  // Already within threshold
         }
     }
     d->rogue.pick = (low + high) / 2.0f;
-
-    // debug print to watch convergence
-    printf("[rogue] tick: direction=%c, new pick=%.6f\n",
-           d->trap.direction, d->rogue.pick);
-    fflush(stdout);
+    // signal dungeon that we've made a new guess:
+    d->trap.direction = 't';
 }
 
 void handler(int sig) {
@@ -53,7 +53,7 @@ void handler(int sig) {
         sem_post(lever1);
         sem_post(lever2);
 
-        // reset search for next trap
+        // reset binary-search state for next trap
         init_search = 0;
     }
 }
@@ -61,19 +61,25 @@ void handler(int sig) {
 int main(void) {
     // 1) Map shared memory
     int fd = shm_open(dungeon_shm_name, O_RDWR, 0);
+    if (fd < 0) { perror("shm_open"); exit(1); }
     d = mmap(NULL, sizeof(*d),
              PROT_READ | PROT_WRITE,
              MAP_SHARED, fd, 0);
     if (d == MAP_FAILED) { perror("mmap"); exit(1); }
+    close(fd);
 
-    // 2) Open both lever semaphores
-    lever1 = sem_open(dungeon_lever_one, 0);
-    lever2 = sem_open(dungeon_lever_two, 0);
+    // 2) Open both lever semaphores (use O_RDWR so we can sem_post)
+    lever1 = sem_open(dungeon_lever_one, O_RDWR);
+    lever2 = sem_open(dungeon_lever_two, O_RDWR);
     if (lever1 == SEM_FAILED || lever2 == SEM_FAILED) {
         perror("sem_open lever"); exit(1);
     }
 
-    // 3) Install a single handler
+    // 2.5) set an initial guess & mark it ready
+    d->rogue.pick      = MAX_PICK_ANGLE / 2.0f;
+    d->trap.direction  = 't';
+
+    // 3) Install a single handler for both signals
     struct sigaction sa = { .sa_handler = handler };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
