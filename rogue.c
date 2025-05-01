@@ -88,10 +88,10 @@ int main(void) {
         perror("sem_open lever"); exit(1);
     }
 
-    // 3) Prime the very first guess
+    // 3) Prime the very first guess, but let the handler initialize bounds
     d->rogue.pick     = MAX_PICK_ANGLE / 2.0f;
     d->trap.direction = 't';
-    init_search       = 1;
+    init_search       = 0;  // clear so first signal sets low/high
 
     // 4) Install our single handler for both signals
     struct sigaction sa = { .sa_handler = handler };
