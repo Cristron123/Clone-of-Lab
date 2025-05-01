@@ -1,110 +1,156 @@
-// rogue.c
-// This process represents the Rogue. It uses a binary‐search strategy
-// to pick locks and then collects treasure once the levers are released.
+/*
+ * rogue.c - This process represents the Rogue character.
+ * It connects to shared memory and semaphores to interact with the Dungeon Master.
+ * The Rogue attempts to disarm traps using a binary search approach and collects
+ * treasure from the treasure room after the Barbarian and Wizard hold the levers.
+ */
+
+#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <sys/mman.h>
 #include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <semaphore.h>
+#include <stdbool.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+
 #include "dungeon_info.h"
 #include "dungeon_settings.h"
 
-static struct Dungeon *d;
-static sem_t *lever1, *lever2;
+static struct Dungeon *dungeon_ptr = NULL;
+static sem_t *lever1_sem = SEM_FAILED, *lever2_sem = SEM_FAILED;
+static int shm_fd = -1;
+volatile sig_atomic_t exit_flag = 0;
 
-// State for our binary search
-static float low, high;
-static int   init_search = 0;
-
-// Perform or adjust a binary‐search guess
-void do_binary_search(void) {
-    char dir = d->trap.direction;
-
-    // If the dungeon has just signaled success, reset for next
-    if (dir == '-') {
-        init_search = 0;
-        return;
+void error_exit(const char *msg) {
+    perror(msg);
+    if (dungeon_ptr && dungeon_ptr != MAP_FAILED) {
+        munmap(dungeon_ptr, sizeof(*dungeon_ptr));
     }
-
-    // If this is the very first time, just set up bounds & guess midpoint
-    if (!init_search) {
-        low         = 0.0f;
-        high        = MAX_PICK_ANGLE;
-        init_search = 1;
-    }
-    // Otherwise adjust bounds based on too‐low / too‐high feedback
-    else if (dir == 'u') {
-        low = d->rogue.pick;
-    }
-    else if (dir == 'd') {
-        high = d->rogue.pick;
-    }
-    // Ignore any 't' (waiting) spurious signals
-    else {
-        return;
-    }
-
-    // Compute next midpoint, publish it, and signal “new guess ready”
-    float next = (low + high) / 2.0f;
-    d->rogue.pick     = next;
-    d->trap.direction = 't';
+    if (lever1_sem != SEM_FAILED) sem_close(lever1_sem);
+    if (lever2_sem != SEM_FAILED) sem_close(lever2_sem);
+    exit(EXIT_FAILURE);
 }
 
-void handler(int sig) {
-    if (sig == DUNGEON_SIGNAL) {
-        do_binary_search();
+void rogue_signal_handler(int signum) {
+    static float current_low = 0.0f, current_high = MAX_PICK_ANGLE;
+
+    if (signum == SIGINT) {
+        exit_flag = 1;
+        return;
     }
-    else if (sig == SEMAPHORE_SIGNAL) {
-        // Copy all 4 treasure chars into spoils
-        for (int i = 0; i < 4; ++i) {
-            d->spoils[i] = d->treasure[i];
+    if (!dungeon_ptr || !dungeon_ptr->running) return;
+
+    if (signum == DUNGEON_SIGNAL) {
+        /* Trap‐disarm binary search */
+        if (dungeon_ptr->trap.locked) {
+            /* Reset on fresh start */
+            char dir0 = dungeon_ptr->trap.direction;
+            if (dir0!='u' && dir0!='d' && dir0!='-') {
+                current_low  = 0.0f;
+                current_high = MAX_PICK_ANGLE;
+            }
+
+            time_t start = time(NULL);
+            while (dungeon_ptr->trap.locked && dungeon_ptr->running && !exit_flag) {
+                if (difftime(time(NULL), start) > (SECONDS_TO_PICK - 0.5)) break;
+
+                char feedback = dungeon_ptr->trap.direction;
+                float last_pick = dungeon_ptr->rogue.pick;
+
+                if (feedback == '-') {
+                    break;
+                }
+                else if (feedback == 'u') {
+                    if (last_pick > current_low)
+                        current_low = last_pick;
+                }
+                else if (feedback == 'd') {
+                    if (last_pick < current_high)
+                        current_high = last_pick;
+                }
+                else {
+                    continue;
+                }
+
+                if (current_high - current_low < 1e-6) break;
+                float next = current_low + (current_high - current_low) / 2.0f;
+                dungeon_ptr->rogue.pick     = next;
+                dungeon_ptr->trap.direction = 't';
+            }
+
+            if (!dungeon_ptr->trap.locked) {
+                current_low  = 0.0f;
+                current_high = MAX_PICK_ANGLE;
+            }
         }
-        // Release both levers so Barbarian + Wizard can finish up
-        sem_post(lever1);
-        sem_post(lever2);
-        // Prepare binary‐search state fresh next time
-        init_search = 0;
+        else {
+            /* trap already unlocked — reset for next */
+            current_low  = 0.0f;
+            current_high = MAX_PICK_ANGLE;
+        }
+    }
+    else if (signum == SEMAPHORE_SIGNAL) {
+        /* Treasure‐room collection */
+        int got = 0;
+        memset(dungeon_ptr->spoils, 0, sizeof(dungeon_ptr->spoils));
+        time_t ts = time(NULL);
+
+        while (dungeon_ptr->running && !exit_flag && got < 4) {
+            if (difftime(time(NULL), ts) > TIME_TREASURE_AVAILABLE) break;
+            if (dungeon_ptr->treasure[got]) {
+                dungeon_ptr->spoils[got] = dungeon_ptr->treasure[got];
+                got++;
+            }
+        }
+        /* release levers for Barbarian & Wizard */
+        sem_post(lever1_sem);
+        sem_post(lever2_sem);
     }
 }
 
 int main(void) {
-    // 1) Open and map shared memory
-    int fd = shm_open(dungeon_shm_name, O_RDWR, 0);
-    if (fd == -1) { perror("shm_open"); exit(1); }
+    /* 1. Shared memory */
+    shm_fd = shm_open(dungeon_shm_name, O_RDWR, 0666);
+    if (shm_fd == -1) error_exit("shm_open");
+    dungeon_ptr = mmap(NULL, sizeof(*dungeon_ptr),
+                       PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (dungeon_ptr == MAP_FAILED) error_exit("mmap");
+    close(shm_fd);
 
-    d = mmap(NULL, sizeof(*d),
-             PROT_READ | PROT_WRITE,
-             MAP_SHARED, fd, 0);
-    if (d == MAP_FAILED) { perror("mmap"); exit(1); }
-    close(fd);
+    /* 2. Semaphores */
+    lever1_sem = sem_open(dungeon_lever_one, 0);
+    lever2_sem = sem_open(dungeon_lever_two, 0);
+    if (lever1_sem==SEM_FAILED || lever2_sem==SEM_FAILED)
+        error_exit("sem_open");
 
-    // 2) Open both lever semaphores
-    lever1 = sem_open(dungeon_lever_one, 0);
-    lever2 = sem_open(dungeon_lever_two, 0);
-    if (lever1 == SEM_FAILED || lever2 == SEM_FAILED) {
-        perror("sem_open lever"); exit(1);
-    }
+    /* 3. Initial pick */
+    dungeon_ptr->rogue.pick     = MAX_PICK_ANGLE/2.0f;
+    dungeon_ptr->trap.direction = 't';
 
-    // 3) Prime nothing here—let the first DUNGEON_SIGNAL trigger init
-    init_search = 0;
-    // But set a dummy pick so direction != '-' when first signal arrives
-    d->rogue.pick     = 0;
-    d->trap.direction = 't';
-
-    // 4) Install our single handler for both signals
-    struct sigaction sa = { .sa_handler = handler };
+    /* 4. Signal handlers */
+    struct sigaction sa = { .sa_handler = rogue_signal_handler };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(DUNGEON_SIGNAL,   &sa, NULL);
     sigaction(SEMAPHORE_SIGNAL, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
 
-    // 5) Loop until dungeon ends
-    while (d->running) {
+    /* 5. Wait for dungeon to finish */
+    while (dungeon_ptr->running && !exit_flag) {
         pause();
     }
 
+    /* Cleanup */
+    munmap(dungeon_ptr, sizeof(*dungeon_ptr));
+    sem_close(lever1_sem);
+    sem_close(lever2_sem);
     return 0;
 }
