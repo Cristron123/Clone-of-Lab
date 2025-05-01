@@ -55,6 +55,7 @@ int main(void) {
         perror("execl rogue"); exit(1);
     }
 
+    sleep(1);
 
     // 8) Hand off control to the dungeon engine
     //    Note: order is (wizard, rogue, barbarian)
@@ -68,4 +69,3 @@ int main(void) {
 
     return 0;
 }
-
