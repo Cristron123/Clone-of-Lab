@@ -1,8 +1,14 @@
 /*
- * rogue.c - This process represents the Rogue character.
- * It connects to shared memory and semaphores to interact with the Dungeon Master.
- * The Rogue attempts to disarm traps using a binary search approach and collects
- * treasure from the treasure room after the Barbarian and Wizard hold the levers.
+rogue.c
+
+This process represents the Rogue character in the dungeon game. 
+It connects to shared memory and semaphores to interact with the Dungeon Master. The Rogue attempts to disarm traps using a binary search approach and collects treasure from the treasure room after the Barbarian and Wizard hold the levers.
+
+Key Features:
+1. **Shared Memory**: Connects to the shared Dungeon structure.
+2. **Semaphore Usage**: Manages access to levers for treasure collection.
+3. **Trap Disarming**: Implements a binary search algorithm to disarm traps.
+4. **Signal Handling**: Responds to signals for dungeon events and cleanup.
  */
 
 #define _XOPEN_SOURCE 700
