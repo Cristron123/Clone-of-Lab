@@ -96,19 +96,19 @@ Preferred edges are bold. Seller nodes display current price.
 
 ### Round 1 — |M| = 1, ε = 1
 
-![Round 1](round1.png)
+![Round 1](Round1.png)
 
 ### Round 2 — |M| = 2, ε = 1
 
-![Round 2](round2.png)
+![Round 2](Round2.png)
 
 ### Round 3 — |M| = 2, ε = 1
 
-![Round 3](round3.png)
+![Round 3](Round3.png)
 
 ### Final — Perfect Matching Found  (|M| = 3)
 
-![Round 4](round4.png)
+![Round 4](Round4.png)
 
 ---
 
