@@ -94,14 +94,6 @@ Node states:
 
 Recovered individuals eventually return to the susceptible state, modeling waning immunity.
 
----
-
-Perfect 👍 — those filenames are clear and clean.
-You just need to **reference them correctly in your README**.
-
-Below is the **final, drop-in README section** that matches **exactly** the image names in your folder.
-
----
 
 ## Results and Visualizations
 
