@@ -1,136 +1,220 @@
-````markdown
-# Market Strategy — Bipartite Market-Clearing Algorithm
+# Network Dynamic Population Model
 
-This project implements the **Demange–Gale–Sotomayor (DGS)** ascending-price auction algorithm to compute a **perfect matching** and **equilibrium seller prices** in a bipartite market. The algorithm iteratively adjusts seller prices based on excess demand until no buyer can improve their utility — ensuring a stable, competitive market outcome.
+## Overview
 
----
+This project implements a **network dynamic population model** to simulate both:
 
-##  Project Objective
+1. **Cascade effects** (spread of information or behavior)
+2. **Pandemic dynamics** using a **Susceptible–Infected–Recovered–Susceptible (SIRS)** model
 
-✔ Practice Python programming with bipartite graph manipulation  
-✔ Understand a real-world market-clearing algorithm  
-✔ Visualize iterative price adjustments and matchings  
-✔ Demonstrate algorithm correctness through interactive plots  
+The simulations are performed over a **directed graph** loaded from a GML file and executed through a Python command-line interface. The model also extends basic epidemic dynamics by incorporating **shelter-in-place** measures and **vaccination**.
 
 ---
 
-##  Installation / Requirements
+## Files
+
+* `dynamic_population.py` – Main Python script that runs the simulations
+* `cascadebehaviour.gml` – Directed graph used for simulations
+* `README.md` – Instructions and documentation 
+
+---
+
+## Requirements
+
+* Python 3.8+
+* Required libraries:
+
+  ```bash
+  pip install networkx matplotlib
+  ```
+
+---
+
+## Running the Program
+
+All simulations are run from the terminal using **one-line commands**.
+
+General syntax:
 
 ```bash
-pip install networkx matplotlib
-````
+python dynamic_population.py <graph_file.gml> --action [cascade|covid] [options]
+```
 
 ---
 
-##  How to Run
+## CASCADE SIMULATION
 
-Basic execution:
+### Description
+
+The cascade model uses a **threshold-based activation rule**:
+
+* A node becomes active if the fraction of its active in-neighbors exceeds a specified threshold.
+* The process repeats until no new activations occur.
+
+### Example Command
 
 ```bash
-python ./market_strategy.py market.gml
+python dynamic_population.py cascadebehaviour.gml --action cascade --initiator 1,2,5 --threshold 0.33 --plot
 ```
 
-With graph visualization:
+### Output
+
+* A plot showing the number of active nodes per round
+* Console message confirming whether a **full cascade** occurred
+
+### Interactive Visualization
 
 ```bash
-python ./market_strategy.py market.gml --plot
+python dynamic_population.py cascadebehaviour.gml --action cascade --initiator 1 --threshold 0.25 --interactive
 ```
 
-Interactive mode (shows each round of computation and pricing):
+In interactive mode, the state of the graph is visualized at each round.
+
+---
+
+## COVID (SIRS) SIMULATION
+
+### Description
+
+The COVID simulation follows an **SIRS model** with the following extensions:
+
+* Infection probability
+* Death probability
+* Finite simulation lifespan (days)
+* Shelter-in-place percentage
+* Vaccination rate
+
+Node states:
+
+* **S** – Susceptible
+* **I** – Infected
+* **R** – Recovered (temporary immunity)
+* **V** – Vaccinated
+* **D** – Dead
+
+Recovered individuals eventually return to the susceptible state, modeling waning immunity.
+
+---
+
+Perfect 👍 — those filenames are clear and clean.
+You just need to **reference them correctly in your README**.
+
+Below is the **final, drop-in README section** that matches **exactly** the image names in your folder.
+
+---
+
+## Results and Visualizations
+
+This section summarizes three COVID-19 simulation scenarios that demonstrate how different parameters affect epidemic spread on the network.
+
+All plots shown below represent **new infections per day**.
+
+---
+
+### 1. Controlled Outbreak (Strong Mitigation)
+
+**Command**
 
 ```bash
-python ./market_strategy.py market.gml --plot --interactive
+python dynamic_population.py cascadebehaviour.gml --action covid --initiator 3,4 --probability_of_infection 0.02 --probability_of_death 0.01 --lifespan 100 --shelter 0.3 --vaccination 0.24 --plot
 ```
 
+**Final state**
+
+* Susceptible (S): 13
+* Infected (I): 0
+* Recovered (R): 0
+* Vaccinated (V): 4
+* Dead (D): 0
+
+**Figure:**
+![Controlled Outbreak](controlled_outbreak.jpg)
+
+**Description:**
+With low infection probability and high sheltering and vaccination rates, the epidemic is quickly suppressed. The infection curve shows minimal early infections followed by zero new cases for the remainder of the simulation, representing successful outbreak control.
+
 ---
 
-##  Expected GML Format
+### 2. Partial Spread with Mixed Outcomes
 
-* 2n nodes:
+**Command**
 
-  * Sellers: `0 .. n-1`
-  * Buyers: `n .. 2n-1`
-* Required edge attribute:
-
-  * `valuation` → buyer’s value for a seller
-* Optional seller attribute:
-
-  * `price` → defaults to `0.0` if missing
-
-Example snippet:
-
-```gml
-node [ id 0 price 0.0 ]
-node [ id 3 ]
-edge [ source 3 target 0 valuation 5.0 ]
+```bash
+python dynamic_population.py cascadebehaviour.gml --action covid --initiator 3,4 --probability_of_infection 0.25 --probability_of_death 0.15 --lifespan 60 --shelter 0.15 --vaccination 0.2 --plot
 ```
 
----
+**Final state**
 
-##  Algorithm Overview (DGS Auction)
+* Susceptible (S): 4
+* Infected (I): 0
+* Recovered (R): 0
+* Vaccinated (V): 3
+* Dead (D): 10
 
-For each buyer **b** and seller **a**:
+**Figure:**
+![Partial Spread with Mixed Outcomes](Partial_Spread_with_Mixed_Outcomes.jpg)
 
-**Utility:**
-[
-u(b,a) = valuation(b,a) - price[a]
-]
-
-Each round:
-1️ Build the **Preferred Seller Graph (PSG)**
- → connect each buyer to their highest-utility sellers
-2️ Compute a **maximum matching**
-3️ If all buyers matched  stop
-4️ Otherwise:
- • Identify **constricted sellers** (over-demanded)
- • Raise their prices by the minimum ε to change preferences
- • Repeat
-
-The process finds a **Walrasian equilibrium** ensuring fairness and stability.
+**Description:**
+Increasing infection and death probabilities while reducing sheltering and vaccination leads to significant spread and mortality. The epidemic peaks early and naturally burns out, leaving a mix of dead, vaccinated, and susceptible individuals.
 
 ---
 
-##  Round-by-Round Visualization
+### 3. Worst-Case Scenario (Uncontrolled Epidemic)
 
-Preferred edges are bold. Seller nodes display current price.
+**Command**
 
-### Round 1 — |M| = 1, ε = 1
-
-![Round 1](Round1.png)
-
-### Round 2 — |M| = 2, ε = 1
-
-![Round 2](Round2.png)
-
-### Round 3 — |M| = 2, ε = 1
-
-![Round 3](Round3.png)
-
-### Final — Perfect Matching Found  (|M| = 3)
-
-![Round 4](Round4.png)
-
----
-
-##  Final Results (Text Output Summary)
-
-```
-Perfect matching size: 3/3
-Matching (buyer -> seller):
- 3 -> 0
- 4 -> 2
- 5 -> 1
-
-Final seller prices:
- seller 0: 3.0000
- seller 1: 1.0000
- seller 2: 0.0000
+```bash
+python dynamic_population.py cascadebehaviour.gml --action covid --initiator 3,4 --probability_of_infection 1.0 --probability_of_death 1.0 --lifespan 50 --shelter 0.0 --vaccination 0.0 --plot
 ```
 
-Interpretation:
-• Buyers are matched optimally based on valuations
-• Sellers with highest demand (0, 1) obtain higher prices
-• No buyer can improve utility → **market cleared**
+**Final state**
+
+* Susceptible (S): 0
+* Infected (I): 0
+* Recovered (R): 0
+* Vaccinated (V): 0
+* Dead (D): 17
+
+**Figure:**
+![Worst Case Scenario](Worst_Case_Scenario.jpg)
+
+**Description:**
+With no mitigation and maximized infection and death probabilities, the disease spreads to all nodes and results in total population loss. The infection curve shows a sharp early spike followed by zero new infections once the network is fully infected.
 
 ---
 
+## Plots
+
+* **Cascade model**: number of active nodes per round
+* **COVID model**: number of new infections per day
+
+Plots are displayed automatically when the `--plot` flag is used.
+
+---
+
+## Error Handling
+
+The program includes validation for:
+
+* Missing or invalid GML files
+* Empty graphs
+* Invalid probability values
+* Nonexistent initiator nodes
+
+Warnings are printed for invalid initiators without stopping the simulation.
+
+---
+
+## Summary
+
+This program demonstrates how network structure and parameter choices influence:
+
+* Cascade propagation
+* Epidemic spread
+* Effects of shelter-in-place and vaccination
+* Containment vs worst-case outcomes
+
+By adjusting parameters, the model reproduces realistic scenarios ranging from full suppression to total population loss.
+
+
+Just tell me 👍
