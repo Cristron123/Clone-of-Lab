@@ -195,18 +195,3 @@ The program includes validation for:
 
 Warnings are printed for invalid initiators without stopping the simulation.
 
----
-
-## Summary
-
-This program demonstrates how network structure and parameter choices influence:
-
-* Cascade propagation
-* Epidemic spread
-* Effects of shelter-in-place and vaccination
-* Containment vs worst-case outcomes
-
-By adjusting parameters, the model reproduces realistic scenarios ranging from full suppression to total population loss.
-
-
-Just tell me 👍
